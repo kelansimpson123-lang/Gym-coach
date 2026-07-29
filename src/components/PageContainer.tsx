@@ -11,7 +11,10 @@ interface PageContainerProps {
  */
 export default function PageContainer({ children }: PageContainerProps) {
   return (
-    <div className="mx-auto min-h-screen max-w-md px-4 pb-28 pt-6">
+    <div
+      className="mx-auto min-h-screen max-w-md px-4 pb-28"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+    >
       {children}
     </div>
   )
