@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 // Repo name — required as the Vite `base` when deploying to GitHub Pages at
 // https://<username>.github.io/gym-coach-app/. Change this if you rename
 // the repository.
-const REPO_NAME = 'Gym-coach'
+const REPO_NAME = 'gym-coach-app'
 
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
