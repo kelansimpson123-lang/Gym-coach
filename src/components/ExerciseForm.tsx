@@ -49,7 +49,7 @@ interface ExerciseFormProps {
 
 const fieldLabel = 'mb-1.5 block text-xs font-medium text-ink-secondary'
 const fieldControl =
-  'w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-sm text-ink-primary outline-none focus:border-accent'
+  'w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-base text-ink-primary outline-none focus:border-accent'
 
 export default function ExerciseForm({
   initialValues,

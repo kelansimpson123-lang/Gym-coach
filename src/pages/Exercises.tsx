@@ -11,6 +11,7 @@ import {
   deleteExercise,
 } from '../services/exerciseService'
 import { getAllMovementCategories } from '../services/movementCategoryService'
+import { importLoggedExercises } from '../database/importLoggedExercises'
 import type { Exercise, MovementCategory } from '../models'
 
 type ModalState = { mode: 'add'; muscleGroup: string } | { mode: 'edit'; exercise: Exercise } | null
@@ -20,6 +21,10 @@ export default function Exercises() {
   const [categories, setCategories] = useState<MovementCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<ModalState>(null)
+  const [importing, setImporting] = useState(false)
+  const [importSummary, setImportSummary] = useState<{ added: number; skipped: number } | null>(
+    null,
+  )
 
   async function refresh() {
     const [ex, cats] = await Promise.all([getAllExercises(), getAllMovementCategories()])
@@ -67,6 +72,17 @@ export default function Exercises() {
     await refresh()
   }
 
+  async function handleImport() {
+    setImporting(true)
+    try {
+      const result = await importLoggedExercises()
+      setImportSummary({ added: result.added.length, skipped: result.skipped.length })
+      await refresh()
+    } finally {
+      setImporting(false)
+    }
+  }
+
   return (
     <PageContainer>
       <header className="mb-6 flex items-center justify-between">
@@ -80,6 +96,31 @@ export default function Exercises() {
       </header>
 
       {loading && <p className="text-ink-muted">Loading your library…</p>}
+
+      {/* Temporary one-time import from your logged notes — safe to click
+          more than once, remove this panel once you've reviewed the results. */}
+      {!loading && (
+        <div className="mb-4 rounded-2xl border border-dashed border-line bg-surface-1/50 p-4">
+          <p className="text-sm text-ink-secondary">Import your logged exercises (one-time)</p>
+          <p className="mt-1 text-xs text-ink-muted">
+            Adds the exercises from your notes as normal library entries — fully editable
+            afterwards, nothing is set in stone.
+          </p>
+          <Button
+            variant="secondary"
+            onClick={handleImport}
+            disabled={importing}
+            className="mt-3"
+          >
+            {importing ? 'Importing…' : 'Import now'}
+          </Button>
+          {importSummary && (
+            <p className="mt-2 text-xs text-ink-muted">
+              Added {importSummary.added}, skipped {importSummary.skipped} (already existed).
+            </p>
+          )}
+        </div>
+      )}
 
       {!loading && exercises.length === 0 && (
         <div className="rounded-2xl border border-dashed border-line p-6 text-center">

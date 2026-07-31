@@ -240,7 +240,7 @@ export default function Home() {
                                     step="0.5"
                                     value={weightDraft}
                                     onChange={(e) => setWeightDraft(e.target.value)}
-                                    className="w-16 rounded-lg border border-line bg-surface-1 px-2 py-1 text-sm text-ink-primary"
+                                    className="w-16 rounded-lg border border-line bg-surface-1 px-2 py-1 text-base text-ink-primary"
                                   />
                                   <button
                                     onClick={() => handleSaveWeight(index)}

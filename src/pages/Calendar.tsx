@@ -274,7 +274,7 @@ export default function Calendar() {
                   Shift
                 </label>
                 <select
-                  className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-sm text-ink-primary"
+                  className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-base text-ink-primary"
                   value={selectedSchedule?.shiftType ?? 'off'}
                   onChange={(e) => handleShiftTypeChange(selectedDate, e.target.value as ShiftType)}
                 >
@@ -291,7 +291,7 @@ export default function Calendar() {
                     Assigned split
                   </label>
                   <select
-                    className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-sm text-ink-primary"
+                    className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-base text-ink-primary"
                     value={selectedDay.assignedSplitId ?? ''}
                     onChange={(e) => handleAssignSplit(selectedDate, e.target.value || null)}
                   >
