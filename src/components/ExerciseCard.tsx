@@ -3,6 +3,7 @@ import type { Exercise, MovementCategory } from '../models'
 interface ExerciseCardProps {
   exercise: Exercise
   category?: MovementCategory
+  lastPerformed?: string
   onClick: () => void
 }
 
@@ -22,11 +23,22 @@ const equipmentLabel: Record<Exercise['equipment'], string> = {
   other: 'Other',
 }
 
-export default function ExerciseCard({ exercise, category, onClick }: ExerciseCardProps) {
+export default function ExerciseCard({ exercise, category, lastPerformed, onClick }: ExerciseCardProps) {
   const weightLabel =
     exercise.currentWorkingWeight === 'bodyweight'
       ? 'Bodyweight'
       : `${exercise.currentWorkingWeight}kg`
+
+  const lastPerformedLabel = (() => {
+    if (!lastPerformed) return 'Not yet performed'
+    const days = Math.round(
+      (Date.parse(new Date().toISOString().slice(0, 10)) - Date.parse(lastPerformed)) /
+        (1000 * 60 * 60 * 24),
+    )
+    if (days <= 0) return 'Today'
+    if (days === 1) return '1 day ago'
+    return `${days} days ago`
+  })()
 
   return (
     <button
@@ -39,6 +51,7 @@ export default function ExerciseCard({ exercise, category, onClick }: ExerciseCa
           {category?.name ?? 'Uncategorised'} · {equipmentLabel[exercise.equipment]} ·{' '}
           {tierLabel[exercise.tier]}
         </p>
+        <p className="mt-0.5 text-[11px] text-ink-muted">{lastPerformedLabel}</p>
       </div>
       <div className="ml-3 shrink-0 text-right">
         <p className="font-semibold text-accent">{weightLabel}</p>

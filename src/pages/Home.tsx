@@ -15,9 +15,10 @@ import {
   getSessionByDate,
   removeExerciseAt,
   swapExerciseAt,
-  toggleExerciseCompleted,
   updateSessionExerciseWeight,
 } from '../services/workoutSessionService'
+import { getCoachRules } from '../services/coachRulesService'
+import { completeSessionExercise, uncompleteSessionExercise } from '../coach/progression'
 import { generateWorkoutExercises } from '../coach/workoutGenerator'
 import type {
   Exercise,
@@ -49,17 +50,22 @@ export default function Home() {
   const [editingWeightIndex, setEditingWeightIndex] = useState<number | null>(null)
   const [weightDraft, setWeightDraft] = useState('')
   const [picker, setPicker] = useState<PickerState>(null)
+  const [targetRepThreshold, setTargetRepThreshold] = useState(8)
+  const [confirmingIndex, setConfirmingIndex] = useState<number | null>(null)
+  const [progressionNotice, setProgressionNotice] = useState<string | null>(null)
 
   async function loadEverything() {
     setLoading(true)
     const [y, m] = today.split('-').map(Number)
-    const [plan, splits, allExercises, allCategories, existingSession] = await Promise.all([
-      getMonthlyPlan(y, m),
-      getActiveTrainingSplits(),
-      getAllExercises(),
-      getAllMovementCategories(),
-      getSessionByDate(today),
-    ])
+    const [plan, splits, allExercises, allCategories, existingSession, coachRules] =
+      await Promise.all([
+        getMonthlyPlan(y, m),
+        getActiveTrainingSplits(),
+        getAllExercises(),
+        getAllMovementCategories(),
+        getSessionByDate(today),
+        getCoachRules(),
+      ])
 
     const todaysPlannedDay = plan?.days.find((d) => d.date === today)
     const split = todaysPlannedDay?.assignedSplitId
@@ -70,6 +76,7 @@ export default function Home() {
     setExercises(allExercises)
     setCategories(allCategories)
     setSession(existingSession ?? null)
+    setTargetRepThreshold(coachRules.targetRepThreshold)
     setLoading(false)
   }
 
@@ -108,10 +115,39 @@ export default function Home() {
     }
   }
 
-  async function handleToggleComplete(index: number) {
+  function handleCompleteTap(index: number) {
     if (!session) return
-    const updated = await toggleExerciseCompleted(session, index)
-    setSession(updated)
+    const entry = session.exercises[index]
+    if (entry.completed) {
+      // Undo — no re-prompt needed.
+      uncompleteSessionExercise(session, index).then(setSession)
+      return
+    }
+    setConfirmingIndex(index)
+  }
+
+  async function handleConfirmCompletion(index: number, hitTarget: boolean) {
+    if (!session) return
+    const entry = session.exercises[index]
+    const exercise = exerciseById.get(entry.exerciseId)
+    if (!exercise) return
+
+    const { session: updatedSession, exercise: updatedExercise } = await completeSessionExercise(
+      session,
+      index,
+      exercise,
+      hitTarget,
+    )
+    setSession(updatedSession)
+    setExercises((prev) => prev.map((e) => (e.id === updatedExercise.id ? updatedExercise : e)))
+    setConfirmingIndex(null)
+
+    if (hitTarget && updatedExercise.currentWorkingWeight !== 'bodyweight') {
+      setProgressionNotice(
+        `${exercise.name} moves up to ${updatedExercise.currentWorkingWeight}kg next time.`,
+      )
+      setTimeout(() => setProgressionNotice(null), 4000)
+    }
   }
 
   async function handleRemove(index: number) {
@@ -168,6 +204,12 @@ export default function Home() {
       </header>
 
       {loading && <p className="text-ink-muted">Loading today's plan…</p>}
+
+      {progressionNotice && (
+        <div className="mb-4 rounded-xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-sm text-accent">
+          {progressionNotice}
+        </div>
+      )}
 
       {!loading && !assignedSplit && (
         <section className="rounded-2xl border border-line bg-surface-1 p-5 shadow-card">
@@ -262,36 +304,58 @@ export default function Home() {
                             </div>
 
                             <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                              <button
-                                onClick={() => handleToggleComplete(index)}
-                                className={[
-                                  'rounded-full px-3 py-1.5 font-medium',
-                                  sessionEntry.completed
-                                    ? 'bg-accent-soft text-accent'
-                                    : 'bg-surface-3 text-ink-secondary',
-                                ].join(' ')}
-                              >
-                                {sessionEntry.completed ? 'Completed' : 'Complete'}
-                              </button>
-                              <button
-                                onClick={() =>
-                                  setPicker({
-                                    mode: 'swap',
-                                    index,
-                                    muscleGroup: exercise.mainMuscleGroup,
-                                    categoryId: exercise.movementCategoryId,
-                                  })
-                                }
-                                className="rounded-full bg-surface-3 px-3 py-1.5 font-medium text-ink-secondary"
-                              >
-                                Swap
-                              </button>
-                              <button
-                                onClick={() => handleRemove(index)}
-                                className="rounded-full bg-surface-3 px-3 py-1.5 font-medium text-status-missed"
-                              >
-                                Remove
-                              </button>
+                              {confirmingIndex === index ? (
+                                <>
+                                  <span className="flex items-center px-1 text-ink-muted">
+                                    Hit {targetRepThreshold}+ reps?
+                                  </span>
+                                  <button
+                                    onClick={() => handleConfirmCompletion(index, true)}
+                                    className="rounded-full bg-accent px-3 py-1.5 font-medium text-surface-0"
+                                  >
+                                    Yes — up the weight
+                                  </button>
+                                  <button
+                                    onClick={() => handleConfirmCompletion(index, false)}
+                                    className="rounded-full bg-surface-3 px-3 py-1.5 font-medium text-ink-secondary"
+                                  >
+                                    Not quite
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => handleCompleteTap(index)}
+                                    className={[
+                                      'rounded-full px-3 py-1.5 font-medium',
+                                      sessionEntry.completed
+                                        ? 'bg-accent-soft text-accent'
+                                        : 'bg-surface-3 text-ink-secondary',
+                                    ].join(' ')}
+                                  >
+                                    {sessionEntry.completed ? 'Completed' : 'Complete'}
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      setPicker({
+                                        mode: 'swap',
+                                        index,
+                                        muscleGroup: exercise.mainMuscleGroup,
+                                        categoryId: exercise.movementCategoryId,
+                                      })
+                                    }
+                                    className="rounded-full bg-surface-3 px-3 py-1.5 font-medium text-ink-secondary"
+                                  >
+                                    Swap
+                                  </button>
+                                  <button
+                                    onClick={() => handleRemove(index)}
+                                    className="rounded-full bg-surface-3 px-3 py-1.5 font-medium text-status-missed"
+                                  >
+                                    Remove
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         )

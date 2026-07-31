@@ -11,6 +11,7 @@ import {
   deleteExercise,
 } from '../services/exerciseService'
 import { getAllMovementCategories } from '../services/movementCategoryService'
+import { getLastPerformedDates } from '../services/exercisePerformanceService'
 import { importLoggedExercises } from '../database/importLoggedExercises'
 import type { Exercise, MovementCategory } from '../models'
 
@@ -19,6 +20,7 @@ type ModalState = { mode: 'add'; muscleGroup: string } | { mode: 'edit'; exercis
 export default function Exercises() {
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [categories, setCategories] = useState<MovementCategory[]>([])
+  const [lastPerformed, setLastPerformed] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<ModalState>(null)
   const [importing, setImporting] = useState(false)
@@ -27,9 +29,14 @@ export default function Exercises() {
   )
 
   async function refresh() {
-    const [ex, cats] = await Promise.all([getAllExercises(), getAllMovementCategories()])
+    const [ex, cats, lastPerformedMap] = await Promise.all([
+      getAllExercises(),
+      getAllMovementCategories(),
+      getLastPerformedDates(),
+    ])
     setExercises(ex)
     setCategories(cats)
+    setLastPerformed(lastPerformedMap)
     setLoading(false)
   }
 
@@ -153,6 +160,7 @@ export default function Exercises() {
                     key={exercise.id}
                     exercise={exercise}
                     category={categoryById.get(exercise.movementCategoryId)}
+                    lastPerformed={lastPerformed.get(exercise.id)}
                     onClick={() => setModal({ mode: 'edit', exercise })}
                   />
                 ))}

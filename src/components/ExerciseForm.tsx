@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import Button from './Button'
 import { getAllMovementCategories } from '../services/movementCategoryService'
+import { getPerformanceForExercise } from '../services/exercisePerformanceService'
 import type {
   Exercise,
   ExercisePriority,
   ExerciseTier,
   EquipmentType,
   MovementCategory,
+  ExercisePerformance,
 } from '../models'
 
 export const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'] as const
@@ -82,10 +84,17 @@ export default function ExerciseForm({
   )
   const [priority, setPriority] = useState<ExercisePriority>(initialValues?.priority ?? 'rotation')
   const [notes, setNotes] = useState(initialValues?.notes ?? '')
+  const [history, setHistory] = useState<ExercisePerformance[]>([])
 
   useEffect(() => {
     getAllMovementCategories().then(setCategories)
   }, [])
+
+  useEffect(() => {
+    if (initialValues) {
+      getPerformanceForExercise(initialValues.id).then(setHistory)
+    }
+  }, [initialValues])
 
   const categoriesForMuscle = useMemo(
     () => categories.filter((c) => c.muscleGroup === muscleGroup),
@@ -141,6 +150,22 @@ export default function ExerciseForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {initialValues && history.length > 0 && (
+        <div className="rounded-xl border border-line bg-surface-2 p-3">
+          <p className="mb-1.5 text-xs font-medium text-ink-secondary">Progression history</p>
+          <ul className="space-y-1 text-xs text-ink-muted">
+            {history.slice(0, 5).map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between">
+                <span>{entry.date}</span>
+                <span className={entry.isProgression ? 'text-accent' : ''}>
+                  {entry.workingWeight === 'bodyweight' ? 'Bodyweight' : `${entry.workingWeight}kg`}
+                  {entry.isProgression ? ' ↑' : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div>
         <label className={fieldLabel} htmlFor="exercise-name">
           Exercise name
