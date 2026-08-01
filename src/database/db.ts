@@ -77,3 +77,14 @@ export function getDB(): Promise<IDBPDatabase<GymCoachDBSchema>> {
 export async function initDatabase(): Promise<void> {
   await getDB()
 }
+
+/** Closes the current connection so the database can be safely deleted
+ * (used by the reset flow) — without this, deleteDatabase can hang
+ * waiting for an open connection to release it. */
+export async function closeDB(): Promise<void> {
+  if (dbPromise) {
+    const db = await dbPromise
+    db.close()
+    dbPromise = null
+  }
+}

@@ -22,6 +22,7 @@ import { getUserSettings, updateUserSettings } from '../services/settingsService
 import { getCardioForDate, toggleCardioActivity } from '../services/cardioService'
 import { completeSessionExercise, uncompleteSessionExercise } from '../coach/progression'
 import { generateWorkoutExercises } from '../coach/workoutGenerator'
+import { getCoachSummary, type CoachSummary } from '../coach/summary'
 import type {
   Exercise,
   MovementCategory,
@@ -59,6 +60,8 @@ export default function Home() {
   const [completedCardio, setCompletedCardio] = useState<Set<string>>(new Set())
   const [addingCardio, setAddingCardio] = useState(false)
   const [newCardioName, setNewCardioName] = useState('')
+  const [summary, setSummary] = useState<CoachSummary | null>(null)
+  const [reasons, setReasons] = useState<Map<string, string>>(new Map())
 
   async function loadEverything() {
     setLoading(true)
@@ -92,6 +95,7 @@ export default function Home() {
 
   useEffect(() => {
     loadEverything()
+    getCoachSummary().then(setSummary)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -112,7 +116,7 @@ export default function Home() {
     setGenerating(true)
     try {
       const recentSessions = await getRecentSessions(10)
-      const sessionExercises = generateWorkoutExercises(
+      const { sessionExercises, reasons: generatedReasons } = generateWorkoutExercises(
         assignedSplit,
         exercises,
         categories,
@@ -120,6 +124,8 @@ export default function Home() {
       )
       const created = await createSession(today, assignedSplit.id, sessionExercises)
       setSession(created)
+      setReasons(generatedReasons)
+      getCoachSummary().then(setSummary)
     } finally {
       setGenerating(false)
     }
@@ -151,6 +157,7 @@ export default function Home() {
     setSession(updatedSession)
     setExercises((prev) => prev.map((e) => (e.id === updatedExercise.id ? updatedExercise : e)))
     setConfirmingIndex(null)
+    getCoachSummary().then(setSummary)
 
     if (hitTarget && updatedExercise.currentWorkingWeight !== 'bodyweight') {
       setProgressionNotice(
@@ -232,6 +239,20 @@ export default function Home() {
         <h1 className="mt-1 text-2xl font-semibold text-ink-primary">{dateLabel}</h1>
       </header>
 
+      {summary && (summary.completionText || summary.balanceMessage) && (
+        <section className="mb-4 rounded-2xl border border-line bg-surface-1 p-4 shadow-card">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+            Coach Summary
+          </p>
+          {summary.completionText && (
+            <p className="mt-1.5 text-sm text-ink-secondary">{summary.completionText}</p>
+          )}
+          {summary.balanceMessage && (
+            <p className="mt-1.5 text-sm text-ink-secondary">{summary.balanceMessage}</p>
+          )}
+        </section>
+      )}
+
       {loading && <p className="text-ink-muted">Loading today's plan…</p>}
 
       {progressionNotice && (
@@ -301,6 +322,11 @@ export default function Home() {
                                   {exercise.name}
                                 </p>
                                 <p className="text-xs text-ink-muted">{category?.name}</p>
+                                {reasons.get(exercise.id) && (
+                                  <p className="mt-0.5 text-[11px] italic text-ink-muted">
+                                    {reasons.get(exercise.id)}
+                                  </p>
+                                )}
                               </div>
                               {editingWeightIndex === index ? (
                                 <div className="flex shrink-0 items-center gap-1">

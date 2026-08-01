@@ -56,6 +56,28 @@ function pickForSlot(
   return sorted[0]
 }
 
+export interface GeneratedWorkout {
+  sessionExercises: SessionExercise[]
+  reasons: Map<string, string>
+}
+
+function reasonForPick(
+  chosen: Exercise,
+  candidates: Exercise[],
+  lastUsedId: string | undefined,
+): string {
+  if (chosen.priority === 'mandatory') {
+    return 'A staple movement — kept in every session.'
+  }
+  if (lastUsedId && chosen.id !== lastUsedId && candidates.some((c) => c.id === lastUsedId)) {
+    return 'Rotated in for variety since last time.'
+  }
+  if (chosen.tier === 1) {
+    return 'Foundational movement for this muscle group.'
+  }
+  return 'Selected to round out this session.'
+}
+
 /**
  * Generates the exercise list for today's session from the assigned split.
  * For each muscle group in the split, fills up to its target exercise
@@ -68,11 +90,12 @@ export function generateWorkoutExercises(
   allExercises: Exercise[],
   allCategories: MovementCategory[],
   recentSessions: WorkoutSession[],
-): SessionExercise[] {
+): GeneratedWorkout {
   const exercisesById = new Map(allExercises.map((e) => [e.id, e]))
   const lastUsedByCategory = buildLastUsedByCategory(recentSessions, exercisesById)
 
-  const result: SessionExercise[] = []
+  const sessionExercises: SessionExercise[] = []
+  const reasons = new Map<string, string>()
   const usedExerciseIds = new Set<string>()
 
   for (const muscleGroup of split.muscleGroups) {
@@ -91,18 +114,20 @@ export function generateWorkoutExercises(
       const candidates = allExercises.filter(
         (e) => e.movementCategoryId === category.id && !usedExerciseIds.has(e.id),
       )
-      const chosen = pickForSlot(candidates, lastUsedByCategory.get(category.id))
+      const lastUsedId = lastUsedByCategory.get(category.id)
+      const chosen = pickForSlot(candidates, lastUsedId)
       if (!chosen) continue
 
       usedExerciseIds.add(chosen.id)
-      result.push({
+      sessionExercises.push({
         exerciseId: chosen.id,
         workingWeight: chosen.currentWorkingWeight,
         completed: false,
       })
+      reasons.set(chosen.id, reasonForPick(chosen, candidates, lastUsedId))
       filled += 1
     }
   }
 
-  return result
+  return { sessionExercises, reasons }
 }
