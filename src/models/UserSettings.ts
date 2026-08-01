@@ -10,5 +10,7 @@ export interface UserSettings {
   theme: Theme
   /** e.g. "increase weight after achieving target reps" — refined in Phase 6. */
   progressionRuleDescription: string
+  /** User-customisable cardio activity names shown on the Home screen. */
+  cardioOptions: string[]
   updatedAt: string
 }

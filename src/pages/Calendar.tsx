@@ -13,6 +13,7 @@ import { ensureScheduleForMonth, upsertScheduleEntry } from '../services/workSch
 import { ensureMonthlyPlan, saveMonthlyPlan, updatePlanDay } from '../services/monthlyPlanService'
 import { getActiveTrainingSplits } from '../services/trainingSplitService'
 import { assignSplitsToPlan } from '../coach/monthlyPlanner'
+import { getCardioForMonth } from '../services/cardioService'
 import type { MonthlyPlan, PlannedDay, ShiftType, TrainingSplit, WorkScheduleEntry } from '../models'
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -36,6 +37,7 @@ export default function Calendar() {
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
+  const [cardioDates, setCardioDates] = useState<Set<string>>(new Set())
 
   const today = todayISO()
 
@@ -48,10 +50,12 @@ export default function Calendar() {
       const sched = await ensureScheduleForMonth(year, month)
       const monthPlan = await ensureMonthlyPlan(year, month, sched)
       const activeSplits = await getActiveTrainingSplits()
+      const cardio = await getCardioForMonth(year, month)
       if (!cancelled) {
         setSchedule(sched)
         setPlan(monthPlan)
         setSplits(activeSplits)
+        setCardioDates(new Set(cardio.filter((c) => c.completed).map((c) => c.date)))
         setLoading(false)
       }
     }
@@ -203,6 +207,7 @@ export default function Calendar() {
                 const visual = dayVisual(day, today)
                 const isToday = date === today
                 const isSelected = date === selectedDate
+                const hasCardio = cardioDates.has(date)
 
                 return (
                   <button
@@ -215,7 +220,10 @@ export default function Calendar() {
                     ].join(' ')}
                   >
                     <span>{dayNum}</span>
-                    <span className={['mt-1 h-1.5 w-1.5 rounded-full', visual.dot, visual.ring].join(' ')} />
+                    <span className="mt-1 flex items-center gap-0.5">
+                      <span className={['h-1.5 w-1.5 rounded-full', visual.dot, visual.ring].join(' ')} />
+                      {hasCardio && <span className="h-1.5 w-1.5 rounded-full bg-status-cardio" />}
+                    </span>
                   </button>
                 )
               })}
@@ -234,6 +242,9 @@ export default function Calendar() {
             </span>
             <span className="flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full ring-1 ring-inset ring-line" /> Unplanned
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-status-cardio" /> Cardio done
             </span>
           </div>
 

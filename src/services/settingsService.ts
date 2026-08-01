@@ -9,14 +9,23 @@ const DEFAULT_SETTINGS: UserSettings = {
   units: 'kg',
   theme: 'dark',
   progressionRuleDescription: 'Increase weight after achieving target reps',
+  cardioOptions: ['Run', 'Bike', 'Stair Machine', 'Walk'],
   updatedAt: nowISO(),
 }
 
-/** Returns the stored settings, creating the default record on first run. */
+/** Returns the stored settings, creating the default record on first run.
+ * Also backfills cardioOptions for records saved before that field existed. */
 export async function getUserSettings(): Promise<UserSettings> {
   const db = await getDB()
   const existing = await db.get(STORES.userSettings, 'user-settings')
-  if (existing) return existing
+  if (existing) {
+    if (!existing.cardioOptions) {
+      const migrated = { ...existing, cardioOptions: DEFAULT_SETTINGS.cardioOptions }
+      await db.put(STORES.userSettings, migrated)
+      return migrated
+    }
+    return existing
+  }
 
   await db.put(STORES.userSettings, DEFAULT_SETTINGS)
   return DEFAULT_SETTINGS

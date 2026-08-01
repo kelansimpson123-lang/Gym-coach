@@ -18,6 +18,8 @@ import {
   updateSessionExerciseWeight,
 } from '../services/workoutSessionService'
 import { getCoachRules } from '../services/coachRulesService'
+import { getUserSettings, updateUserSettings } from '../services/settingsService'
+import { getCardioForDate, toggleCardioActivity } from '../services/cardioService'
 import { completeSessionExercise, uncompleteSessionExercise } from '../coach/progression'
 import { generateWorkoutExercises } from '../coach/workoutGenerator'
 import type {
@@ -53,11 +55,15 @@ export default function Home() {
   const [targetRepThreshold, setTargetRepThreshold] = useState(8)
   const [confirmingIndex, setConfirmingIndex] = useState<number | null>(null)
   const [progressionNotice, setProgressionNotice] = useState<string | null>(null)
+  const [cardioOptions, setCardioOptions] = useState<string[]>([])
+  const [completedCardio, setCompletedCardio] = useState<Set<string>>(new Set())
+  const [addingCardio, setAddingCardio] = useState(false)
+  const [newCardioName, setNewCardioName] = useState('')
 
   async function loadEverything() {
     setLoading(true)
     const [y, m] = today.split('-').map(Number)
-    const [plan, splits, allExercises, allCategories, existingSession, coachRules] =
+    const [plan, splits, allExercises, allCategories, existingSession, coachRules, settings, cardioToday] =
       await Promise.all([
         getMonthlyPlan(y, m),
         getActiveTrainingSplits(),
@@ -65,6 +71,8 @@ export default function Home() {
         getAllMovementCategories(),
         getSessionByDate(today),
         getCoachRules(),
+        getUserSettings(),
+        getCardioForDate(today),
       ])
 
     const todaysPlannedDay = plan?.days.find((d) => d.date === today)
@@ -77,6 +85,8 @@ export default function Home() {
     setCategories(allCategories)
     setSession(existingSession ?? null)
     setTargetRepThreshold(coachRules.targetRepThreshold)
+    setCardioOptions(settings.cardioOptions)
+    setCompletedCardio(new Set(cardioToday.map((c) => c.activityType)))
     setLoading(false)
   }
 
@@ -181,6 +191,25 @@ export default function Home() {
       setSession(updated)
     }
     setPicker(null)
+  }
+
+  async function handleToggleCardio(activity: string) {
+    const updated = await toggleCardioActivity(today, activity)
+    setCompletedCardio(new Set(updated.map((c) => c.activityType)))
+  }
+
+  async function handleAddCardioOption() {
+    const name = newCardioName.trim()
+    if (!name || cardioOptions.includes(name)) {
+      setAddingCardio(false)
+      setNewCardioName('')
+      return
+    }
+    const updatedOptions = [...cardioOptions, name]
+    await updateUserSettings({ cardioOptions: updatedOptions })
+    setCardioOptions(updatedOptions)
+    setAddingCardio(false)
+    setNewCardioName('')
   }
 
   const groupedSessionExercises = useMemo(() => {
@@ -371,6 +400,61 @@ export default function Home() {
                 ))}
               </div>
             </>
+          )}
+        </section>
+      )}
+
+      {!loading && cardioOptions.length > 0 && (
+        <section className="mt-4 rounded-2xl border border-line bg-surface-1 p-5 shadow-card">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+            Today's Cardio
+          </p>
+          <div className="mt-3 space-y-2">
+            {cardioOptions.map((activity) => {
+              const isDone = completedCardio.has(activity)
+              return (
+                <label
+                  key={activity}
+                  className="flex items-center gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isDone}
+                    onChange={() => handleToggleCardio(activity)}
+                    className="h-5 w-5 accent-[#8FBF6B]"
+                  />
+                  <span
+                    className={isDone ? 'text-ink-muted line-through' : 'text-ink-primary'}
+                  >
+                    {activity}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+
+          {addingCardio ? (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={newCardioName}
+                onChange={(e) => setNewCardioName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddCardioOption()}
+                placeholder="e.g. Swimming"
+                className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-base text-ink-primary"
+              />
+              <Button variant="secondary" onClick={handleAddCardioOption}>
+                Add
+              </Button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddingCardio(true)}
+              className="mt-3 text-xs font-medium text-accent"
+            >
+              + Add other cardio option
+            </button>
           )}
         </section>
       )}

@@ -3,19 +3,10 @@ import { addPerformanceEntry } from '../services/exercisePerformanceService'
 import { saveSession } from '../services/workoutSessionService'
 import type { Exercise, WorkoutSession } from '../models'
 
-/** How much to add when the target rep threshold is hit. Free-weight
- * increments are smaller than machine/cable increments, matching typical
- * plate availability. Bodyweight exercises aren't auto-progressed by
- * weight — reps are the natural progression there instead. */
-const WEIGHT_INCREMENT: Record<Exercise['equipment'], number> = {
-  barbell: 2.5,
-  dumbbell: 2.5,
-  'smith-machine': 2.5,
-  cable: 2.5,
-  machine: 5,
-  other: 2.5,
-  bodyweight: 0,
-}
+/** How much to add when the target rep threshold is hit. Bodyweight
+ * exercises aren't auto-progressed by weight — reps are the natural
+ * progression there instead. */
+const WEIGHT_INCREMENT = 2.5
 
 export function computeNextWorkingWeight(
   exercise: Exercise,
@@ -23,7 +14,7 @@ export function computeNextWorkingWeight(
 ): Exercise['currentWorkingWeight'] {
   if (!hitTarget) return exercise.currentWorkingWeight
   if (exercise.currentWorkingWeight === 'bodyweight') return 'bodyweight'
-  return exercise.currentWorkingWeight + WEIGHT_INCREMENT[exercise.equipment]
+  return exercise.currentWorkingWeight + WEIGHT_INCREMENT
 }
 
 /**
@@ -50,12 +41,18 @@ export async function completeSessionExercise(
   })
 
   let updatedExercise = exercise
+  let nextWeight = entry.workingWeight
   if (isProgression) {
-    const nextWeight = computeNextWorkingWeight(exercise, true)
+    nextWeight = computeNextWorkingWeight(exercise, true)
     updatedExercise = await updateExerciseWorkingWeight(exercise.id, nextWeight)
   }
 
-  const exercises = session.exercises.map((e, i) => (i === index ? { ...e, completed: true } : e))
+  // The performance log above kept today's actual lifted weight for
+  // history. The card itself now shows the new weight immediately, so the
+  // bump is unmistakable rather than only appearing in a toast.
+  const exercises = session.exercises.map((e, i) =>
+    i === index ? { ...e, completed: true, workingWeight: nextWeight } : e,
+  )
   const updatedSession = await saveSession({ ...session, exercises })
 
   return { session: updatedSession, exercise: updatedExercise }
