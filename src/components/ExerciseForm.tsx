@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import Button from './Button'
 import { getAllMovementCategories } from '../services/movementCategoryService'
 import { getPerformanceForExercise } from '../services/exercisePerformanceService'
@@ -10,6 +10,8 @@ import type {
   MovementCategory,
   ExercisePerformance,
 } from '../models'
+
+const ProgressionChart = lazy(() => import('./ProgressionChart'))
 
 export const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'] as const
 
@@ -153,7 +155,10 @@ export default function ExerciseForm({
       {initialValues && history.length > 0 && (
         <div className="rounded-xl border border-line bg-surface-2 p-3">
           <p className="mb-1.5 text-xs font-medium text-ink-secondary">Progression history</p>
-          <ul className="space-y-1 text-xs text-ink-muted">
+          <Suspense fallback={<div className="h-32 w-full" />}>
+            <ProgressionChart history={history} />
+          </Suspense>
+          <ul className="mt-2 space-y-1 text-xs text-ink-muted">
             {history.slice(0, 5).map((entry) => (
               <li key={entry.id} className="flex items-center justify-between">
                 <span>{entry.date}</span>
@@ -260,7 +265,16 @@ export default function ExerciseForm({
         <label className={fieldLabel} htmlFor="working-weight">
           Current working weight
         </label>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setWeight((prev) => String(Math.max(0, (Number(prev) || 0) - 2.5)))}
+            disabled={isBodyweight}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-ink-secondary disabled:opacity-40"
+            aria-label="Decrease weight"
+          >
+            −
+          </button>
           <input
             id="working-weight"
             className={fieldControl}
@@ -273,16 +287,25 @@ export default function ExerciseForm({
             disabled={isBodyweight}
             placeholder="e.g. 82.5"
           />
-          <label className="flex shrink-0 items-center gap-2 text-sm text-ink-secondary">
-            <input
-              type="checkbox"
-              checked={isBodyweight}
-              onChange={(e) => setIsBodyweight(e.target.checked)}
-              className="h-4 w-4 accent-[#8FBF6B]"
-            />
-            Bodyweight
-          </label>
+          <button
+            type="button"
+            onClick={() => setWeight((prev) => String((Number(prev) || 0) + 2.5))}
+            disabled={isBodyweight}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-ink-secondary disabled:opacity-40"
+            aria-label="Increase weight"
+          >
+            +
+          </button>
         </div>
+        <label className="mt-2 flex items-center gap-2 text-sm text-ink-secondary">
+          <input
+            type="checkbox"
+            checked={isBodyweight}
+            onChange={(e) => setIsBodyweight(e.target.checked)}
+            className="h-4 w-4 accent-[#8FBF6B]"
+          />
+          Bodyweight
+        </label>
       </div>
 
       <div>

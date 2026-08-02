@@ -12,5 +12,8 @@ export interface UserSettings {
   progressionRuleDescription: string
   /** User-customisable cardio activity names shown on the Home screen. */
   cardioOptions: string[]
+  /** ISO date of the last successful data export, or undefined if never
+   * exported — drives the backup reminder banner. */
+  lastExportedAt?: string
   updatedAt: string
 }

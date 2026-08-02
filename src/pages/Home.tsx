@@ -20,6 +20,7 @@ import {
 import { getCoachRules } from '../services/coachRulesService'
 import { getUserSettings, updateUserSettings } from '../services/settingsService'
 import { getCardioForDate, toggleCardioActivity } from '../services/cardioService'
+import { exportAllData } from '../database/exportData'
 import { completeSessionExercise, uncompleteSessionExercise } from '../coach/progression'
 import { generateWorkoutExercises } from '../coach/workoutGenerator'
 import { getCoachSummary, type CoachSummary } from '../coach/summary'
@@ -62,6 +63,9 @@ export default function Home() {
   const [newCardioName, setNewCardioName] = useState('')
   const [summary, setSummary] = useState<CoachSummary | null>(null)
   const [reasons, setReasons] = useState<Map<string, string>>(new Map())
+  const [lastExportedAt, setLastExportedAt] = useState<string | undefined>(undefined)
+  const [backupDismissed, setBackupDismissed] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   async function loadEverything() {
     setLoading(true)
@@ -89,6 +93,7 @@ export default function Home() {
     setSession(existingSession ?? null)
     setTargetRepThreshold(coachRules.targetRepThreshold)
     setCardioOptions(settings.cardioOptions)
+    setLastExportedAt(settings.lastExportedAt)
     setCompletedCardio(new Set(cardioToday.map((c) => c.activityType)))
     setLoading(false)
   }
@@ -205,6 +210,22 @@ export default function Home() {
     setCompletedCardio(new Set(updated.map((c) => c.activityType)))
   }
 
+  const daysSinceBackup = lastExportedAt
+    ? Math.floor((Date.now() - Date.parse(lastExportedAt)) / (1000 * 60 * 60 * 24))
+    : null
+  const showBackupBanner =
+    !backupDismissed && (daysSinceBackup === null || daysSinceBackup >= 14)
+
+  async function handleBackupNow() {
+    setExporting(true)
+    try {
+      await exportAllData()
+      setLastExportedAt(new Date().toISOString())
+    } finally {
+      setExporting(false)
+    }
+  }
+
   async function handleAddCardioOption() {
     const name = newCardioName.trim()
     if (!name || cardioOptions.includes(name)) {
@@ -238,6 +259,31 @@ export default function Home() {
         <p className="text-sm text-ink-muted">Good to see you</p>
         <h1 className="mt-1 text-2xl font-semibold text-ink-primary">{dateLabel}</h1>
       </header>
+
+      {showBackupBanner && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-1 px-4 py-3">
+          <p className="text-sm text-ink-secondary">
+            {daysSinceBackup === null
+              ? "You haven't backed up your data yet."
+              : `It's been ${daysSinceBackup} days since your last backup.`}
+          </p>
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={handleBackupNow}
+              disabled={exporting}
+              className="rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-surface-0"
+            >
+              {exporting ? 'Exporting…' : 'Back up now'}
+            </button>
+            <button
+              onClick={() => setBackupDismissed(true)}
+              className="rounded-full bg-surface-3 px-3 py-1.5 text-xs font-medium text-ink-secondary"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
 
       {summary && (summary.completionText || summary.balanceMessage) && (
         <section className="mb-4 rounded-2xl border border-line bg-surface-1 p-4 shadow-card">
@@ -330,6 +376,17 @@ export default function Home() {
                               </div>
                               {editingWeightIndex === index ? (
                                 <div className="flex shrink-0 items-center gap-1">
+                                  <button
+                                    onClick={() =>
+                                      setWeightDraft((prev) =>
+                                        String(Math.max(0, (Number(prev) || 0) - 2.5)),
+                                      )
+                                    }
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-1 text-ink-secondary"
+                                    aria-label="Decrease weight"
+                                  >
+                                    −
+                                  </button>
                                   <input
                                     autoFocus
                                     type="number"
@@ -337,11 +394,20 @@ export default function Home() {
                                     step="0.5"
                                     value={weightDraft}
                                     onChange={(e) => setWeightDraft(e.target.value)}
-                                    className="w-16 rounded-lg border border-line bg-surface-1 px-2 py-1 text-base text-ink-primary"
+                                    className="w-16 rounded-lg border border-line bg-surface-1 px-2 py-1 text-center text-base text-ink-primary"
                                   />
                                   <button
+                                    onClick={() =>
+                                      setWeightDraft((prev) => String((Number(prev) || 0) + 2.5))
+                                    }
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-1 text-ink-secondary"
+                                    aria-label="Increase weight"
+                                  >
+                                    +
+                                  </button>
+                                  <button
                                     onClick={() => handleSaveWeight(index)}
-                                    className="text-xs font-medium text-accent"
+                                    className="ml-1 text-xs font-medium text-accent"
                                   >
                                     Save
                                   </button>

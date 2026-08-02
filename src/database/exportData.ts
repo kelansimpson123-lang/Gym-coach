@@ -1,5 +1,6 @@
 import { getDB } from './db'
 import { STORES, DB_NAME } from './schema'
+import { updateUserSettings } from '../services/settingsService'
 
 export async function exportAllData(): Promise<void> {
   const db = await getDB()
@@ -17,4 +18,6 @@ export async function exportAllData(): Promise<void> {
   link.download = `gym-coach-backup-${dateStamp}.json`
   link.click()
   URL.revokeObjectURL(url)
+
+  await updateUserSettings({ lastExportedAt: new Date().toISOString() })
 }
